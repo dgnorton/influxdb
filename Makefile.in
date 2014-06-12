@@ -71,10 +71,10 @@ snappy_file    = snappy-$(snappy_version).tar.gz
 snappy_deps    = $(snappy_dir)/.libs/libsnappy.a
 
 # leveldb variables
-leveldb_version = 1.15.0
-leveldb_dir     = /tmp/leveldb.influxdb.$(arch)
-leveldb_file    = leveldb-$(leveldb_version).tar.gz
-leveldb_deps    = $(leveldb_dir)/libleveldb.a
+leveldb_version = 1.0.2
+leveldb_dir     = /tmp/hyperleveldb.influxdb.$(arch)
+leveldb_file    = HyperLevelDB-releases-$(leveldb_version).tar.gz
+leveldb_deps    = $(leveldb_dir)/.libs/libhyperleveldb.a
 
 profile=off
 ifneq ($(profile),off)
@@ -84,8 +84,8 @@ endif
 
 # levigo flags
 ifeq ($(uname_S),Linux)
-CGO_CFLAGS  += -I$(leveldb_dir)/include
-CGO_LDFLAGS += $(leveldb_dir)/libleveldb.a $(snappy_dir)/.libs/libsnappy.a -lstdc++
+CGO_CFLAGS  += -I$(leveldb_dir)
+CGO_LDFLAGS += $(leveldb_dir)/.libs/libhyperleveldb.a $(snappy_dir)/.libs/libsnappy.a -lstdc++
 export CGO_CFLAGS
 export CGO_LDFLAGS
 else
@@ -114,9 +114,12 @@ ifeq ($(uname_S),Linux)
 	rm -rf $(leveldb_dir)
 	mkdir -p $(leveldb_dir)
 	bash -c "cd $(leveldb_dir); \
-	wget https://leveldb.googlecode.com/files/$(leveldb_file); \
-	tar --strip-components=1 -xvzf $(leveldb_file); \
-	CXXFLAGS='-I$(snappy_dir) $(cflags)' LDFLAGS='-L$(snappy_dir)/.libs' make"
+       wget https://github.com/rescrv/HyperLevelDB/archive/releases/$(leveldb_version).tar.gz ; \
+       tar --strip-components=1 -xvzf $(leveldb_version).tar.gz ; \
+       autoreconf -i; \
+       ./configure; \
+       CXXFLAGS='-I$(snappy_dir) $(cflags)' LDFLAGS='-L$(snappy_dir)/.libs' make; \
+       "
 endif
 
 levigo_dependency = github.com/jmhodges/levigo
@@ -141,7 +144,7 @@ dependencies_paths := $(addprefix src/,$(dependencies))
 src/$(levigo_dependency):
 	$(GO) get -d $(levigo_dependency)
 	bash -c "pushd $@; find . -name \*.go | xargs sed -i 's/\/\/ #cgo LDFLAGS: -lleveldb\|#cgo LDFLAGS: -lleveldb//g'; popd"
-
+	bash -c "pushd $@; find . -name \*.go | xargs sed -i 's/#include \"leveldb\/c\.h\"/#include \"hyperleveldb\/c\.h\"/g' ; popd"
 
 $(dependencies_paths):
 	for i in $(dependencies); do $(GO) get -d $$i; done
